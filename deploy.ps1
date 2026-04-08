@@ -48,8 +48,8 @@ $env:PATH = "$NodeDir;$env:PATH"
 Set-Location $ProjectDir
 
 function Write-Step { param($msg) Write-Host "`n=== $msg ===" -ForegroundColor Cyan }
-function Write-Ok   { param($msg) Write-Host "  ✓ $msg" -ForegroundColor Green }
-function Write-Fail { param($msg) Write-Host "  ✗ $msg" -ForegroundColor Red; exit 1 }
+function Write-Ok   { param($msg) Write-Host "  OK $msg" -ForegroundColor Green }
+function Write-Fail { param($msg) Write-Host "  FAIL $msg" -ForegroundColor Red; exit 1 }
 
 # ── 1. Git status check ───────────────────────────────────────────────────────
 Write-Step "Checking working tree"
