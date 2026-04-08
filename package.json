@@ -54,6 +54,10 @@
       {
         "from": "dist-renderer",
         "to": "renderer"
+      },
+      {
+        "from": "assets",
+        "to": "assets"
       }
     ],
     "win": {

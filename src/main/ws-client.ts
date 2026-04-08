@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { stateManager } from './state';
+import { logger } from './logger';
 
 type WsStatus = 'connected' | 'disconnected' | 'reconnecting';
 type StatusListener = (status: WsStatus) => void;
@@ -36,8 +37,10 @@ class WsClient {
     this.reconnectDelay = 1000;
 
     if (enabled && url) {
+      logger.info(`WS configured — connecting to ${url}`);
       this.connect();
     } else {
+      logger.info('WS disabled');
       stateManager.setWsConnected(false);
       this.emitStatus('disconnected');
     }
@@ -46,17 +49,20 @@ class WsClient {
   private connect(): void {
     if (this.destroyed || !this.enabled) return;
 
+    logger.info(`WS connecting to ${this.url} ...`);
     this.emitStatus('reconnecting');
 
     try {
       this.ws = new WebSocket(this.url);
-    } catch (err) {
+    } catch (err: any) {
+      logger.error(`WS create error: ${err?.message ?? err}`);
       this.scheduleReconnect();
       return;
     }
 
     this.ws.on('open', () => {
       this.reconnectDelay = 1000;
+      logger.info('WS open — sending auth');
       this.sendRaw({ type: 'auth', secret: this.secret, plugin: 'elite-dangerous' });
     });
 
@@ -67,29 +73,35 @@ class WsClient {
           this.authenticated = true;
           stateManager.setWsConnected(true);
           this.emitStatus('connected');
+          logger.info('WS authenticated — connected');
           // Send current state on connect
           this.sendStateUpdate();
+        } else {
+          logger.warn(`WS unexpected message: ${msg.type}`);
         }
       } catch {
         // ignore
       }
     });
 
-    this.ws.on('close', () => {
+    this.ws.on('close', (code, reason) => {
       this.authenticated = false;
       stateManager.setWsConnected(false);
       this.emitStatus('disconnected');
+      logger.warn(`WS closed (code ${code}${reason?.length ? ': ' + reason.toString() : ''})`);
       this.scheduleReconnect();
     });
 
-    this.ws.on('error', () => {
-      // error always followed by close
+    this.ws.on('error', (err) => {
+      logger.error(`WS error: ${err.message}`);
+      // error is always followed by close
     });
   }
 
   private scheduleReconnect(): void {
     if (this.destroyed || !this.enabled) return;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    logger.info(`WS reconnecting in ${this.reconnectDelay / 1000}s ...`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxDelay);
       this.connect();

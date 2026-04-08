@@ -13,6 +13,7 @@ import { AppSettings, DEFAULT_SETTINGS } from './types';
 import { stateManager } from './state';
 import { wsClient } from './ws-client';
 import { startFileWatcher, stopFileWatcher } from './file-watcher';
+import { logger } from './logger';
 
 const store = new Store<{ settings: AppSettings }>({
   name: 'ed-companion',
@@ -27,14 +28,15 @@ let tray: Tray | null = null;
 
 function getIconPath(): string {
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, '..', 'assets', 'icon.ico');
+    // extraResources copies assets/ → resources/assets/
+    return path.join(process.resourcesPath, 'assets', 'icon.ico');
   }
   return path.join(__dirname, '..', '..', 'assets', 'icon.ico');
 }
 
 function getAssetPath(file: string): string {
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, '..', 'assets', file);
+    return path.join(process.resourcesPath, 'assets', file);
   }
   return path.join(__dirname, '..', '..', 'assets', file);
 }
@@ -209,6 +211,8 @@ function setupIPC(): void {
 
   ipcMain.handle('window:minimize', () => mainWindow?.minimize());
   ipcMain.handle('window:close', () => mainWindow?.hide());
+
+  ipcMain.handle('log:get-history', () => logger.getHistory());
 }
 
 function applySettings(settings: AppSettings): void {
@@ -226,11 +230,17 @@ function applySettings(settings: AppSettings): void {
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  logger.info('ED Companion starting up');
   const settings = getSettings();
 
   if (!settings.journalPath) {
     const detected = autoDetectJournalPath();
-    if (detected) saveSettings({ ...settings, journalPath: detected });
+    if (detected) {
+      logger.info(`Auto-detected journal path: ${detected}`);
+      saveSettings({ ...settings, journalPath: detected });
+    } else {
+      logger.warn('Journal path not found — set it manually in Settings');
+    }
   }
 
   createSplash();
@@ -241,6 +251,10 @@ app.whenReady().then(() => {
   stateManager.onChange((state) => {
     mainWindow?.webContents.send('ed:state-update', state);
     wsClient.scheduleStateUpdate();
+  });
+
+  logger.onEntry((entry) => {
+    mainWindow?.webContents.send('ed:log', entry);
   });
 
   wsClient.onStatusChange((status) => {

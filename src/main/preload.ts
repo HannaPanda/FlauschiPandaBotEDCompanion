@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { AppSettings, EDState } from './types';
+import { LogEntry } from './logger';
 
 contextBridge.exposeInMainWorld('edApi', {
   // Settings
@@ -24,5 +25,13 @@ contextBridge.exposeInMainWorld('edApi', {
     const handler = (_event: Electron.IpcRendererEvent, status: string) => cb(status);
     ipcRenderer.on('ed:ws-status', handler);
     return () => ipcRenderer.removeListener('ed:ws-status', handler);
+  },
+
+  // Log
+  getLogHistory: (): Promise<LogEntry[]> => ipcRenderer.invoke('log:get-history'),
+  onLogEntry: (cb: (entry: LogEntry) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, entry: LogEntry) => cb(entry);
+    ipcRenderer.on('ed:log', handler);
+    return () => ipcRenderer.removeListener('ed:log', handler);
   },
 });

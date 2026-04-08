@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { EDState, AppSettings, DEFAULT_STATE } from './types';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import Log from './pages/Log';
 
-type Tab = 'dashboard' | 'settings';
+type Tab = 'dashboard' | 'settings' | 'log';
 
 // Check if running in Electron
 const isElectron = typeof window !== 'undefined' && 'edApi' in window;
@@ -45,6 +46,8 @@ export default function App() {
       <div className="flex-1 overflow-hidden">
         {tab === 'dashboard' ? (
           <Dashboard state={state} settings={settings} />
+        ) : tab === 'log' ? (
+          <Log />
         ) : (
           <Settings
             settings={settings}
@@ -64,7 +67,7 @@ function TitleBar({
 }: {
   wsStatus: string;
   tab: string;
-  onTabChange: (t: 'dashboard' | 'settings') => void;
+  onTabChange: (t: Tab) => void;
 }) {
   const handleMinimize = () => {
     if ('edApi' in window) window.edApi.minimize();
@@ -85,6 +88,9 @@ function TitleBar({
       <div className="no-drag flex gap-1">
         <TabButton active={tab === 'dashboard'} onClick={() => onTabChange('dashboard')}>
           DASHBOARD
+        </TabButton>
+        <TabButton active={tab === 'log'} onClick={() => onTabChange('log')}>
+          LOG
         </TabButton>
         <TabButton active={tab === 'settings'} onClick={() => onTabChange('settings')}>
           SETTINGS

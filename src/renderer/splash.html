@@ -102,8 +102,9 @@
       // In dev: file is at src/renderer/splash.html → icon 2 levels up at assets/icon.png
       // In prod: file is at resources/app.asar/src/renderer/splash.html → icon at resources/../assets/icon.png
       const candidates = [
-        up(base, 2) + '/assets/icon.png',
-        up(base, 4) + '/assets/icon.png',
+        up(base, 2) + '/assets/icon.png',          // dev: src/renderer → root
+        up(base, 4) + '/assets/icon.png',          // prod asar: dist/main → resources/../assets (old path)
+        up(base, 3) + '/assets/icon.png',          // prod asar: resources/assets (extraResources)
         '../../assets/icon.png',
       ];
       const img = document.getElementById('logo');

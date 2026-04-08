@@ -115,6 +115,12 @@ export const DEFAULT_STATE: EDState = {
   wsConnected: false,
 };
 
+export interface LogEntry {
+  ts: string;
+  level: 'info' | 'warn' | 'error';
+  msg: string;
+}
+
 declare global {
   interface Window {
     edApi: {
@@ -127,6 +133,8 @@ declare global {
       closeWindow: () => Promise<void>;
       onStateUpdate: (cb: (state: EDState) => void) => () => void;
       onWsStatus: (cb: (status: string) => void) => () => void;
+      getLogHistory: () => Promise<LogEntry[]>;
+      onLogEntry: (cb: (entry: LogEntry) => void) => () => void;
     };
   }
 }
