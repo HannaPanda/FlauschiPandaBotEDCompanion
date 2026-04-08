@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ED Companion</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        background: #050810;
+        overflow: hidden;
+        font-family: 'Consolas', 'Monaco', monospace;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 18px;
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.94); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+
+      .logo {
+        width: 148px;
+        height: 148px;
+        border-radius: 50%;
+        border: 1px solid #00d4ff22;
+        box-shadow:
+          0 0 40px #00d4ff22,
+          0 0 80px #00d4ff11,
+          inset 0 0 20px #00000044;
+        object-fit: cover;
+      }
+
+      .title {
+        font-size: 14px;
+        font-weight: bold;
+        letter-spacing: 0.28em;
+        color: #ff6a00;
+        text-align: center;
+      }
+
+      .subtitle {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        color: #1a2a4a;
+        text-align: center;
+        margin-top: -10px;
+      }
+
+      .loader {
+        display: flex;
+        gap: 7px;
+        margin-top: 6px;
+      }
+
+      .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #00d4ff;
+        animation: bounce 1.3s ease-in-out infinite;
+      }
+
+      .dot:nth-child(2) { animation-delay: 0.15s; }
+      .dot:nth-child(3) { animation-delay: 0.30s; }
+
+      @keyframes bounce {
+        0%, 70%, 100% { opacity: 0.15; transform: translateY(0); }
+        35%            { opacity: 1;    transform: translateY(-5px); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <img class="logo" id="logo" alt="ED Companion" />
+      <div>
+        <div class="title">ED COMPANION</div>
+        <div class="subtitle">ELITE DANGEROUS LIVE MONITOR</div>
+      </div>
+      <div class="loader">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+    <script>
+      // Resolve icon.png relative to this file's location, works in both dev and prod
+      const base = window.location.pathname.replace(/[^/\\]+$/, '');
+      const up = (p, n) => { let r = p; for (let i = 0; i < n; i++) r = r.replace(/[/\\][^/\\]+$/, ''); return r; };
+      // In dev: file is at src/renderer/splash.html → icon 2 levels up at assets/icon.png
+      // In prod: file is at resources/app.asar/src/renderer/splash.html → icon at resources/../assets/icon.png
+      const candidates = [
+        up(base, 2) + '/assets/icon.png',
+        up(base, 4) + '/assets/icon.png',
+        '../../assets/icon.png',
+      ];
+      const img = document.getElementById('logo');
+      let idx = 0;
+      function tryNext() {
+        if (idx >= candidates.length) return;
+        img.src = candidates[idx++];
+      }
+      img.onerror = tryNext;
+      tryNext();
+    </script>
+  </body>
+</html>

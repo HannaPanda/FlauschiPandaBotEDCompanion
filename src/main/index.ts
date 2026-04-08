@@ -20,7 +20,26 @@ const store = new Store<{ settings: AppSettings }>({
 });
 
 let mainWindow: BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+
+// ── Icon path helper ──────────────────────────────────────────────────────────
+
+function getIconPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, '..', 'assets', 'icon.ico');
+  }
+  return path.join(__dirname, '..', '..', 'assets', 'icon.ico');
+}
+
+function getAssetPath(file: string): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, '..', 'assets', file);
+  }
+  return path.join(__dirname, '..', '..', 'assets', file);
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
 
 function getSettings(): AppSettings {
   return store.get('settings', DEFAULT_SETTINGS);
@@ -42,9 +61,44 @@ function autoDetectJournalPath(): string {
   return '';
 }
 
+// ── Splash Screen ─────────────────────────────────────────────────────────────
+
+function createSplash(): void {
+  splashWindow = new BrowserWindow({
+    width: 360,
+    height: 360,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    backgroundColor: '#050810',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  splashWindow.loadFile(
+    path.join(__dirname, '..', '..', 'src', 'renderer', 'splash.html')
+  );
+
+  splashWindow.once('ready-to-show', () => splashWindow?.show());
+}
+
+function closeSplash(): void {
+  if (!splashWindow) return;
+  splashWindow.destroy();
+  splashWindow = null;
+}
+
+// ── Main Window ───────────────────────────────────────────────────────────────
+
 function createWindow(): void {
   const settings = getSettings();
   const { x, y, w, h } = settings.windowBounds;
+
+  const iconPath = getIconPath();
 
   mainWindow = new BrowserWindow({
     x,
@@ -58,6 +112,7 @@ function createWindow(): void {
     alwaysOnTop: settings.alwaysOnTop,
     opacity: settings.opacity,
     backgroundColor: '#050810',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -76,6 +131,7 @@ function createWindow(): void {
   }
 
   mainWindow.once('ready-to-show', () => {
+    closeSplash();
     mainWindow!.show();
   });
 
@@ -96,15 +152,13 @@ function saveBounds(): void {
   saveSettings({ ...settings, windowBounds: { x, y, w, h } });
 }
 
+// ── Tray ──────────────────────────────────────────────────────────────────────
+
 function createTray(): void {
-  // Create a simple 16x16 icon programmatically if no icon file
-  const iconPath = path.join(__dirname, '..', '..', 'assets', 'icon.ico');
-  let icon: Electron.NativeImage;
-  if (fs.existsSync(iconPath)) {
-    icon = nativeImage.createFromPath(iconPath);
-  } else {
-    icon = nativeImage.createEmpty();
-  }
+  const iconPath = getIconPath();
+  const icon = fs.existsSync(iconPath)
+    ? nativeImage.createFromPath(iconPath)
+    : nativeImage.createEmpty();
 
   tray = new Tray(icon);
   tray.setToolTip('ED Companion');
@@ -122,12 +176,7 @@ function createTray(): void {
       },
     },
     { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        app.exit(0);
-      },
-    },
+    { label: 'Quit', click: () => app.exit(0) },
   ]);
   tray.setContextMenu(menu);
   tray.on('click', () => {
@@ -139,6 +188,8 @@ function createTray(): void {
     }
   });
 }
+
+// ── IPC ───────────────────────────────────────────────────────────────────────
 
 function setupIPC(): void {
   ipcMain.handle('settings:get', () => getSettings());
@@ -152,13 +203,9 @@ function setupIPC(): void {
     return wsClient.testConnection(url, secret);
   });
 
-  ipcMain.handle('settings:detect-path', () => {
-    return autoDetectJournalPath();
-  });
+  ipcMain.handle('settings:detect-path', () => autoDetectJournalPath());
 
-  ipcMain.handle('settings:verify-path', (_event, p: string) => {
-    return fs.existsSync(p);
-  });
+  ipcMain.handle('settings:verify-path', (_event, p: string) => fs.existsSync(p));
 
   ipcMain.handle('window:minimize', () => mainWindow?.minimize());
   ipcMain.handle('window:close', () => mainWindow?.hide());
@@ -170,48 +217,41 @@ function applySettings(settings: AppSettings): void {
     mainWindow.setOpacity(settings.opacity);
   }
 
-  // Restart file watcher with new path
   stopFileWatcher();
-  if (settings.journalPath) {
-    startFileWatcher(settings);
-  }
+  if (settings.journalPath) startFileWatcher(settings);
 
-  // Reconnect WS with new config
   wsClient.configure(settings.wsEnabled, settings.wsUrl, settings.wsSecret);
 }
+
+// ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
   const settings = getSettings();
 
-  // Auto-detect journal path on first run
   if (!settings.journalPath) {
     const detected = autoDetectJournalPath();
-    if (detected) {
-      saveSettings({ ...settings, journalPath: detected });
-    }
+    if (detected) saveSettings({ ...settings, journalPath: detected });
   }
 
+  createSplash();
   createWindow();
   createTray();
   setupIPC();
 
-  // Subscribe to state changes → push to renderer
   stateManager.onChange((state) => {
     mainWindow?.webContents.send('ed:state-update', state);
     wsClient.scheduleStateUpdate();
   });
 
-  // Subscribe to WS status → push to renderer
   wsClient.onStatusChange((status) => {
     mainWindow?.webContents.send('ed:ws-status', status);
   });
 
-  const currentSettings = getSettings();
-  applySettings(currentSettings);
+  applySettings(getSettings());
 });
 
 app.on('window-all-closed', () => {
-  // Don't quit on window close (tray app)
+  // Tray app — don't quit when windows close
 });
 
 app.on('before-quit', () => {

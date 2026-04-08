@@ -1,6 +1,10 @@
 # ED Companion
 
-Elite Dangerous live monitoring overlay. Tracks fuel, route planning, scoop warnings, and streams events via WebSocket.
+<p align="center">
+  <img src="https://assets.flauschipandabot.de/uploads/1747246718-5693db49-6e08-466a-87b4-72cfec6e1dbc.png" width="180" alt="ED Companion" style="border-radius:50%;" />
+</p>
+
+Elite Dangerous live monitoring overlay. Tracks fuel, route planning, scoop warnings, exobiology scans, FSS progress, and streams events via WebSocket.
 
 ## Requirements
 
