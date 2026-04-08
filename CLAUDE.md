@@ -13,12 +13,15 @@ Monitors journal files, shows live fuel/route/exobio status, streams structured 
 
 ## Deploy Workflow — the one and only way to release
 
+**This is the canonical release process. Claude and all agents must always use this script — never push tags manually, never run `git tag` or `electron-builder` directly.**
+
 ```powershell
 .\deploy.ps1              # patch bump: 1.0.0 → 1.0.1
 .\deploy.ps1 -Minor       # minor bump: 1.0.0 → 1.1.0
 .\deploy.ps1 -Major       # major bump: 1.0.0 → 2.0.0
 .\deploy.ps1 -Version v1.5.0   # explicit version
 .\deploy.ps1 -Force       # include dirty working tree in release commit
+.\deploy.ps1 -SkipWait    # push tag without waiting for CI (debugging only)
 ```
 
 **What the script does (in order):**
@@ -30,7 +33,17 @@ Monitors journal files, shows live fuel/route/exobio status, streams structured 
 6. Waits for the GitHub Actions `Build & Release` workflow to succeed
 7. Downloads the freshly built `ED-Companion-portable.exe` to the Desktop
 
-**Never push tags manually** — always go through `deploy.ps1` so linting runs first.
+**Workflow for Claude agents:**
+1. Make all code changes and commit them to `main` (without tagging).
+2. Ensure the working tree is clean (`git status --porcelain` returns nothing).
+3. Run `powershell.exe -ExecutionPolicy Bypass -File deploy.ps1` from the project root.
+4. The script handles everything from there — do not interfere with git or electron-builder directly.
+5. If the script fails at the CI step, check the Actions run URL printed in the output, fetch logs via the GitHub API, fix the root cause, then re-run `deploy.ps1` (it will auto-increment the patch version again).
+
+**Known pitfalls already fixed (do not repeat these mistakes):**
+- `deploy.ps1` must contain only ASCII characters — PowerShell parsing breaks on UTF-8 symbols (✓ ✗) if the file isn't saved as UTF-8-BOM. Use ASCII replacements like `OK` / `FAIL`.
+- Do NOT set `WIN_CSC_LINK: ''` in the GitHub Actions workflow env — electron-builder treats any value (including empty string) as a path and fails. Use only `CSC_IDENTITY_AUTO_DISCOVERY: false`.
+- The workflow must declare `permissions: contents: write` at the top level, otherwise `GITHUB_TOKEN` defaults to read-only and the release publish step returns 403.
 
 ---
 
@@ -51,11 +64,14 @@ Alternatively set `$env:GH_TOKEN` before running `deploy.ps1`.
 ## GitHub Actions
 
 `.github/workflows/release.yml` triggers on every `v*` tag push:
+- Top-level `permissions: contents: write` (required for release creation)
 - Runs on `windows-latest`
+- Env: `CSC_IDENTITY_AUTO_DISCOVERY: false` (skip code signing — no cert)
 - `npm ci` → `npm run dist` (Vite + tsc + electron-builder)
-- Uploads `ED-Companion-portable.exe` as release asset
+- electron-builder builds the portable .exe AND publishes it directly to GitHub Releases
+- The `softprops/action-gh-release` step is kept as a fallback but the primary publish is via electron-builder's built-in GH publisher
 
-The `GITHUB_TOKEN` secret is provided automatically by Actions. No secrets need to be configured manually.
+The `GITHUB_TOKEN` secret is provided automatically by Actions. No manual secrets needed.
 
 ---
 
