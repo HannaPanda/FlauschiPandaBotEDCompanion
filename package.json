@@ -1,6 +1,6 @@
 {
   "name": "ed-companion",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Elite Dangerous Live Monitoring Companion",
   "main": "dist/main/index.js",
   "scripts": {
