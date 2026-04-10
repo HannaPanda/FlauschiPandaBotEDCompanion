@@ -115,7 +115,15 @@ class WsClient {
   }
 
   sendEvent(type: string, payload: object): void {
-    if (!this.authenticated) return;
+    if (!this.authenticated) {
+      if (type !== 'state_update') {
+        logger.warn(`Event dropped (not connected): ${type}`);
+      }
+      return;
+    }
+    if (type !== 'state_update') {
+      logger.info(`-> ${type}`);
+    }
     this.sendRaw({
       type,
       timestamp: new Date().toISOString(),

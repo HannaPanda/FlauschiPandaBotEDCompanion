@@ -3,7 +3,6 @@ import * as path from 'path';
 import { getLatestJournalFile, tailJournalFile, parseNavRoute } from './journal';
 import { stateManager } from './state';
 import { AppSettings } from './types';
-import { wsClient } from './ws-client';
 import { logger } from './logger';
 
 let watcher: chokidar.FSWatcher | null = null;
@@ -60,22 +59,14 @@ export function startFileWatcher(settings: AppSettings): void {
   watcher.on('change', (filePath: string) => {
     const base = path.basename(filePath);
     if (base === 'NavRoute.json') {
+      // NavRoute.json update is also fired as a 'NavRoute' journal event which
+      // handles the WS send with the full payload. Here we only update state
+      // so the dashboard reflects the route even before the journal event fires.
       const route = parseNavRoute(journalDir);
       if (route.length > 0) {
         stateManager.setRoute(route);
-        const dest = route[route.length - 1];
-        const totalDist = route.reduce((acc, r) => acc + r.distanceLy, 0);
-        logger.info(`Route set: ${dest.system} (${route.length} jumps, ${totalDist.toFixed(1)} ly)`);
-        wsClient.sendEvent('route_set', {
-          destination: dest.system,
-          totalJumps: route.length,
-          totalDistanceLy: totalDist,
-          route,
-        });
       } else {
         stateManager.clearRoute();
-        logger.info('Route cleared');
-        wsClient.sendEvent('route_cleared', {});
       }
     }
   });

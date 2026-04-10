@@ -6,6 +6,7 @@ import { stateManager } from './state';
 import { wsClient } from './ws-client';
 import { computeScoopStatus } from './scoop';
 import { AppSettings } from './types';
+import { logger } from './logger';
 
 let currentJournalPath: string | null = null;
 let currentWatcher: fs.FSWatcher | null = null;
@@ -130,6 +131,7 @@ function handleFSDJump(e: any, settings: AppSettings): void {
   const fuelCurrent = e.FuelLevel  ?? stateManager.get().fuelCurrent;
   const fuelUsed    = e.FuelUsed   ?? 0;
   const newSystem   = e.StarSystem || stateManager.get().currentSystem;
+  logger.info(`Jump: ${stateManager.get().currentSystem} -> ${newSystem}`);
   const starClass   = (e.StarClass || '').charAt(0).toUpperCase();
   const scoopable   = SCOOPABLE_CLASSES.has(starClass);
 
@@ -231,13 +233,18 @@ function flushScoopingCompleted(): void {
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 function handleNavRoute(e: any): void {
-  const journalDir = path.dirname(currentJournalPath || '');
+  if (!currentJournalPath) {
+    logger.warn('NavRoute event received but no journal path known — skipping');
+    return;
+  }
+  const journalDir = path.dirname(currentJournalPath);
   const route = parseNavRoute(journalDir);
 
   if (route.length > 0) {
     stateManager.setRoute(route);
-    const dest     = route[route.length - 1];
+    const dest      = route[route.length - 1];
     const totalDist = route.reduce((acc, r) => acc + r.distanceLy, 0);
+    logger.info(`Route set: ${dest.system} (${route.length} jumps, ${totalDist.toFixed(1)} ly)`);
     wsClient.sendEvent('route_set', {
       destination:             dest.system,
       totalJumps:              route.length,
@@ -252,12 +259,14 @@ function handleNavRoute(e: any): void {
     });
   } else {
     stateManager.clearRoute();
+    logger.info('Route cleared (NavRoute event, empty route)');
     wsClient.sendEvent('route_cleared', {});
   }
 }
 
 function handleNavRouteClear(): void {
   stateManager.clearRoute();
+  logger.info('Route cleared (NavRouteClear event)');
   wsClient.sendEvent('route_cleared', {});
 }
 
